@@ -506,6 +506,28 @@ def load_segment_customer():
 
 
 
+def load_segmentToMongo():
+    print(f" INICIO LOAD SEGMENT_CUSTOMER")
+
+    client = bigquery.Client(project='zeta-medley-405005')
+    
+    query_string = """
+    select customer_id ,category_name ,order_item_subtotal
+    from `zeta-medley-405005.dep_raw.segment_customer`
+    """
+    
+    segment_df = client.query(query_string).to_dataframe()
+    segment_dict = segment_df.to_dict(orients = 'records')
+    
+    dbconnect = get_connect_mongo()
+    dbname=dbconnect["retail_db"]
+    collection_name = dbname["segment_VictorMartinez"] 
+    collection_name.insert_many(segment_dict)
+    dbconnect.close()
+
+
+
+
 with DAG(
     dag_id="load_project",
     schedule="20 04 * * *", 
@@ -562,6 +584,11 @@ with DAG(
         python_callable=load_segment_customer,
         dag=dag
     )
+    step_load_segmentToMongo= PythonOperator(
+        task_id='load_segmentToMongo_id',
+        python_callable=load_segmentToMongo,
+        dag=dag
+    )
     step_end = PythonOperator(
         task_id='step_end_id',
         python_callable=end_process,
@@ -579,5 +606,5 @@ with DAG(
     step_load_customers>>step_load_master_order
     step_load_categories>>step_load_master_order
     step_load_departments>>step_load_master_order
-    step_load_master_order>>step_load_bi_orders>>step_load_segment_customer>>step_end
+    step_load_master_order>>step_load_bi_orders>>step_load_segment_customer>>step_load_segmentToMongo>>step_end
 
