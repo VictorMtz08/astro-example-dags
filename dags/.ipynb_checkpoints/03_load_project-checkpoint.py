@@ -144,7 +144,7 @@ def transform_date(text):
 
 
 
-def load_orders():
+def load_order_items():
     print(f" INICIO LOAD ORDER ITEMS")
     
     dbconnect = get_connect_mongo()
@@ -197,6 +197,61 @@ def load_orders():
 
 
 
+def load_customers():
+    print(f" INICIO LOAD CUSTOMERS")
+    
+    dbconnect = get_connect_mongo()
+    dbname=dbconnect["retail_db"]
+    collection_name = dbname["customers"] 
+    customers = collection_name.find({})
+    customers_df = DataFrame(customers)
+    dbconnect.close()
+
+    customers_df['_id'] = customers_df['_id'].astype(str)
+    
+    customers_rows=len(customers_df)
+    print(f" Se obtuvo  {customers_rows}  Filas")
+    
+    order_items_rows=len(order_items_df)
+    customers_rows=len(customers_df)
+    if customers_rows>0 :
+        client = bigquery.Client(project='zeta-medley-405005')
+        table_id =  "zeta-medley-405005.dep_raw.customers"
+        
+        job_config = bigquery.LoadJobConfig(
+            schema=[
+                bigquery.SchemaField("_id", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("customer_fname", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_lname", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_email", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_password", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_street", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_city", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_state", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_zipcode", bigquery.enums.SqlTypeNames.INTEGER),
+            ],
+            write_disposition="WRITE_TRUNCATE",
+        )
+    
+    
+        job = client.load_table_from_dataframe(
+            customers_df, table_id, job_config=job_config
+        )  
+        job.result()  # Wait for the job to complete.
+    
+        table = client.get_table(table_id)  # Make an API request.
+        print(
+            "Loaded {} rows and {} columns to {}".format(
+                table.num_rows, len(table.schema), table_id
+            )
+        )
+    else : 
+        print('alerta no hay registros en la tabla customers')
+
+
+
+
 
 
 with DAG(
@@ -220,6 +275,16 @@ with DAG(
         python_callable=load_orders,
         dag=dag
     )
+    step_load_order_items = PythonOperator(
+        task_id='load_order_items_id',
+        python_callable=load_order_items,
+        dag=dag
+    )
+    step_load_customers = PythonOperator(
+        task_id='load_customers_id',
+        python_callable=load_customers,
+        dag=dag
+    )
     step_end = PythonOperator(
         task_id='step_end_id',
         python_callable=end_process,
@@ -227,7 +292,11 @@ with DAG(
     )
     step_start>>step_load_products
     step_start>>step_load_orders
+    step_start>>step_load_order_items
+    step_start>>step_load_customers
     step_load_products>>step_end
     step_load_orders>>step_end
+    step_load_order_items>>step_end
+    step_load_customers>>step_end
 
 
