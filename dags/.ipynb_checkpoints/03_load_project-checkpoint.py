@@ -344,6 +344,107 @@ def load_departments():
 
 
 
+def get_group_status(text):
+    text = str(text)
+    if text =='CLOSED':
+        d='END'
+    elif text =='COMPLETE':
+        d='END'
+    else :
+        d='TRANSIT'
+    return d
+
+
+def get_national_currency(amount):
+    return amount * var1
+    
+
+def load_master_order():
+    print(f" INICIO LOAD MASTER")
+
+    headers_filter = {
+    'tipocambio': ['fecha' ,'compra','venta','nan']
+    }
+    #Obtiene tipo de cambio
+    dwn_url_tipocambio= 'https://www.sunat.gob.pe/a/txt/tipoCambio.txt'
+    df = pd.read_csv(dwn_url_tipocambio, names=headers_filter['tipocambio'],sep='|')
+    list_t= df.values.tolist()
+    var1 = list_t[0][1]
+    
+    client = bigquery.Client(project='zeta-medley-405005')
+    
+    sql = """
+        SELECT *
+        FROM `zeta-medley-405005.dep_raw.order_items`
+    """
+    
+    m_order_items_df = client.query(sql).to_dataframe()
+    
+    
+    sql_2 = """
+    SELECT *
+    FROM `zeta-medley-405005.dep_raw.orders`
+    """
+    
+    m_orders_df = client.query(sql_2).to_dataframe()
+    
+    df_join = m_orders_df.merge(m_order_items_df, left_on='order_id', right_on='order_item_order_id', how='inner')
+    
+    df_master=df_join[[ 'order_id', 'order_date_x', 'order_customer_id',
+       'order_status',  'order_item_id',
+       'order_item_order_id', 'order_item_product_id', 'order_item_quantity',
+       'order_item_subtotal', 'order_item_product_price']]
+    
+    df_master=df_master.rename(columns={"order_date_x":"order_date"})
+    
+    df_master['order_status_group']  = df_master['order_status'].map(get_group_status)
+    df_master['order_date'] = df_master['order_date'].astype(str)
+    df_master['order_date'] = pd.to_datetime(df_master['order_date'], format='%Y-%m-%d').dt.date
+    df_master['order_item_subtotal_mn']  = df_master['order_item_subtotal'].map(get_national_currency)
+
+    master_rows=len(df_master)
+    print(f" Se obtuvo  {master_rows}  Filas")
+
+    df_master_rows=len(df_master)
+    
+    if df_master_rows>0 :
+        client = bigquery.Client()
+    
+        table_id =  "zeta-medley-405005.dep_raw.master_order"
+        job_config = bigquery.LoadJobConfig(
+            schema=[
+                bigquery.SchemaField("order_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_date", bigquery.enums.SqlTypeNames.DATE),
+                bigquery.SchemaField("order_customer_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_status", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("order_item_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_item_order_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_item_product_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_item_quantity", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_item_subtotal", bigquery.enums.SqlTypeNames.FLOAT),
+                bigquery.SchemaField("order_item_product_price", bigquery.enums.SqlTypeNames.FLOAT),
+                bigquery.SchemaField("order_status_group", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("order_item_subtotal_mn", bigquery.enums.SqlTypeNames.FLOAT),
+            ],
+            write_disposition="WRITE_TRUNCATE",
+        )
+    
+    
+        job = client.load_table_from_dataframe(
+            df_master, table_id, job_config=job_config
+        )  
+        job.result()  # Wait for the job to complete.
+    
+        table = client.get_table(table_id)  # Make an API request.
+        print(
+            "Loaded {} rows and {} columns to {}".format(
+                table.num_rows, len(table.schema), table_id
+            )
+        )
+    else : 
+        print('alerta no hay registros en la tabla master_order')
+        
+
 
 
 with DAG(
@@ -387,6 +488,11 @@ with DAG(
         python_callable=load_departments,
         dag=dag
     )
+    step_load_master_order = PythonOperator(
+        task_id='load_master_order_id',
+        python_callable=load_master_order,
+        dag=dag
+    )
     step_end = PythonOperator(
         task_id='step_end_id',
         python_callable=end_process,
@@ -398,11 +504,11 @@ with DAG(
     step_start>>step_load_customers
     step_start>>step_load_categories
     step_start>>step_load_departments
-    step_load_products>>step_end
-    step_load_orders>>step_end
-    step_load_order_items>>step_end
-    step_load_customers>>step_end
-    step_load_categories>>step_end
-    step_load_departments>>step_end
-
+    step_load_products>>step_load_master_order
+    step_load_orders>>step_load_master_order
+    step_load_order_items>>step_load_master_order
+    step_load_customers>>step_load_master_order
+    step_load_categories>>step_load_master_order
+    step_load_departments>>step_load_master_order
+    step_load_master_order>>step_end
 
