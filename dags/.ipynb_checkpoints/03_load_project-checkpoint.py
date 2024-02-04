@@ -212,8 +212,8 @@ def load_customers():
     customers_rows=len(customers_df)
     print(f" Se obtuvo  {customers_rows}  Filas")
     
-    order_items_rows=len(order_items_df)
     customers_rows=len(customers_df)
+    
     if customers_rows>0 :
         client = bigquery.Client(project='zeta-medley-405005')
         table_id =  "zeta-medley-405005.dep_raw.customers"
@@ -251,6 +251,52 @@ def load_customers():
 
 
 
+def load_categories():
+    print(f" INICIO LOAD CATEGORIES")
+    
+    dbconnect = get_connect_mongo()
+    dbname=dbconnect["retail_db"]
+    collection_name = dbname["categories"] 
+    categories = collection_name.find({})
+    categories_df = DataFrame(categories)
+    dbconnect.close()
+    
+    categories_df = categories_df.drop(columns=['_id'])
+    
+    categories_rows=len(categories_df)
+    print(f" Se obtuvo  {categories_rows}  Filas")
+    
+    categories_rows=len(categories_df)
+    
+    if categories_rows>0 :
+        client = bigquery.Client()
+    
+        table_id =  "premium-guide-410714.dep_raw.categories"
+        job_config = bigquery.LoadJobConfig(
+            schema=[
+                bigquery.SchemaField("category_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("category_department_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("category_name", bigquery.enums.SqlTypeNames.STRING),
+            ],
+            write_disposition="WRITE_TRUNCATE",
+        )
+    
+    
+        job = client.load_table_from_dataframe(
+            categories_df, table_id, job_config=job_config
+        )  
+        job.result()  # Wait for the job to complete.
+    
+        table = client.get_table(table_id)  # Make an API request.
+        print(
+            "Loaded {} rows and {} columns to {}".format(
+                table.num_rows, len(table.schema), table_id
+            )
+        )
+    else : 
+        print('alerta no hay registros en la tabla categories')
+
+
 
 
 
@@ -285,6 +331,11 @@ with DAG(
         python_callable=load_customers,
         dag=dag
     )
+    step_load_categories = PythonOperator(
+        task_id='load_categories_id',
+        python_callable=load_categories,
+        dag=dag
+    )
     step_end = PythonOperator(
         task_id='step_end_id',
         python_callable=end_process,
@@ -294,9 +345,11 @@ with DAG(
     step_start>>step_load_orders
     step_start>>step_load_order_items
     step_start>>step_load_customers
+    step_start>>step_load_categories
     step_load_products>>step_end
     step_load_orders>>step_end
     step_load_order_items>>step_end
     step_load_customers>>step_end
+    step_load_categories>>step_end
 
 
