@@ -472,7 +472,7 @@ def load_bi_orders():
 
 
 
-def load_bi_orders():
+def load_segment_customer():
     print(f" INICIO LOAD SEGMENT_CUSTOMER")
 
     client = bigquery.Client(project='zeta-medley-405005')
@@ -557,6 +557,11 @@ with DAG(
         python_callable=load_bi_orders,
         dag=dag
     )
+    step_load_segment_customer = PythonOperator(
+        task_id='load_segment_customer_id',
+        python_callable=load_segment_customer,
+        dag=dag
+    )
     step_end = PythonOperator(
         task_id='step_end_id',
         python_callable=end_process,
@@ -574,6 +579,5 @@ with DAG(
     step_load_customers>>step_load_master_order
     step_load_categories>>step_load_master_order
     step_load_departments>>step_load_master_order
-    step_load_master_order>>step_load_bi_orders
-    step_load_bi_orders>>step_end
+    step_load_master_order>>step_load_bi_orders>>step_load_segment_customer>>step_end
 
