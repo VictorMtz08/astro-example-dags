@@ -465,8 +465,40 @@ def load_bi_orders():
     c.category_department_id=d.department_id
     group by order_date,c.category_name ,d.department_name
     """
+
+    query_job = client.query(query_string)
+    rows = list(query_job.result())
+    print(f" Se obtuvo  {rows}  Filas")
+
+
+
+def load_bi_orders():
+    print(f" INICIO LOAD SEGMENT_CUSTOMER")
+
+    client = bigquery.Client(project='zeta-medley-405005')
     
-    m_order_items_df = client.query(sql).to_dataframe()
+    query_string = """
+    create or replace table `zeta-medley-405005.dep_raw.segment_customer` as
+    select customer_id,category_name , order_item_subtotal from
+    (
+      SELECT customer_id,category_name,order_item_subtotal,
+      RANK() OVER (PARTITION BY customer_id ORDER BY order_item_subtotal DESC) AS rank_ 
+     FROM (
+          SELECT 
+          d.customer_id ,c.category_name 
+          , sum (a.order_item_subtotal) order_item_subtotal
+          FROM `zeta-medley-405005.dep_raw.master_order` a
+          inner join  `zeta-medley-405005-410714.dep_raw.products` b on
+          a.order_item_product_id=b.product_id
+          inner join `zeta-medley-405005.dep_raw.categories` c on
+          b.product_category_id=c.category_id
+          inner join `zeta-medley-405005.dep_raw.customers` d on
+          a.order_customer_id=d.customer_id
+          group by 1,2
+      )
+    )
+    where rank_=1
+    """
 
     query_job = client.query(query_string)
     rows = list(query_job.result())
