@@ -377,8 +377,8 @@ def get_group_status(text):
         d='TRANSIT'
     return d
 
-
-    
+def get_national_currency(amount):
+    return amount * var1
 
 def load_master_order():
     
