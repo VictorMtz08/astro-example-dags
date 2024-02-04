@@ -380,7 +380,6 @@ def load_master_order():
     
     m_order_items_df = client.query(sql).to_dataframe()
     
-    
     sql_2 = """
     SELECT *
     FROM `zeta-medley-405005.dep_raw.orders`
