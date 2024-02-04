@@ -90,11 +90,12 @@ def transform_date(text):
 
 def load_orders():
     print(f" INICIO LOAD ORDERS")
+    
     dbconnect = get_connect_mongo()
     dbname=dbconnect["retail_db"]
     collection_name = dbname["orders"] 
-    products = collection_name.find({})
-    products_df = DataFrame(orders)
+    orders = collection_name.find({})
+    orders_df = DataFrame(orders)
     dbconnect.close()
     orders_df['_id'] = orders_df['_id'].astype(str)
     orders_df['order_date']  = orders_df['order_date'].map(transform_date)
