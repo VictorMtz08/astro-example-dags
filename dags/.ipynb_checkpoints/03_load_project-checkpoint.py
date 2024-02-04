@@ -499,7 +499,7 @@ def load_segment_customer():
           d.customer_id ,c.category_name 
           , sum (a.order_item_subtotal) order_item_subtotal
           FROM `zeta-medley-405005.dep_raw.master_order` a
-          inner join  `zeta-medley-405005-410714.dep_raw.products` b on
+          inner join  `zeta-medley-405005.dep_raw.products` b on
           a.order_item_product_id=b.product_id
           inner join `zeta-medley-405005.dep_raw.categories` c on
           b.product_category_id=c.category_id
