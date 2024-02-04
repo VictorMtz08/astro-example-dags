@@ -445,6 +445,34 @@ def load_master_order():
         
 
 
+def load_bi_orders():
+    print(f" INICIO LOAD BI_ORDERS")
+
+    client = bigquery.Client(project='zeta-medley-405005')
+    
+    query_string = """
+    create or replace table `zeta-medley-405005.dep_raw.bi_orders` as
+    SELECT 
+     order_date,c.category_name ,d.department_name 
+     , sum (a.order_item_subtotal) order_item_subtotal
+     , sum (a.order_item_quantity) order_item_quantity
+    FROM `zeta-medley-405005.dep_raw.master_order` a
+    inner join  `zeta-medley-405005.dep_raw.products` b on
+    a.order_item_product_id=b.product_id
+    inner join `zeta-medley-405005.dep_raw.categories` c on
+    b.product_category_id=c.category_id
+    inner join `zeta-medley-405005.dep_raw.departments` d on
+    c.category_department_id=d.department_id
+    group by order_date,c.category_name ,d.department_name
+    """
+    
+    m_order_items_df = client.query(sql).to_dataframe()
+
+    query_job = client.query(query_string)
+    rows = list(query_job.result())
+    print(f" Se obtuvo  {rows}  Filas")
+
+
 
 with DAG(
     dag_id="load_project",
@@ -492,6 +520,11 @@ with DAG(
         python_callable=load_master_order,
         dag=dag
     )
+    step_load_bi_orders = PythonOperator(
+        task_id='load_bi_orders_id',
+        python_callable=load_bi_orders,
+        dag=dag
+    )
     step_end = PythonOperator(
         task_id='step_end_id',
         python_callable=end_process,
@@ -509,5 +542,6 @@ with DAG(
     step_load_customers>>step_load_master_order
     step_load_categories>>step_load_master_order
     step_load_departments>>step_load_master_order
-    step_load_master_order>>step_end
+    step_load_master_order>>step_load_bi_orders
+    step_load_bi_orders>>step_end
 
