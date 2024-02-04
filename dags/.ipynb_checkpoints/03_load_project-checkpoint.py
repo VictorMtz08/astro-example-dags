@@ -9,6 +9,7 @@ from pymongo import MongoClient
 from pandas import DataFrame
 from google.cloud import bigquery
 import pandas as pd
+from datetime import date
 
 default_args = {
     'owner': 'Datapath',
