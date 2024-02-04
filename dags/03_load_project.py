@@ -356,21 +356,21 @@ def get_group_status(text):
 
 
 def get_national_currency(amount):
+    headers_filter = {
+    'tipocambio': ['fecha' ,'compra','venta','nan']
+    }
+    
+    dwn_url_tipocambio= 'https://www.sunat.gob.pe/a/txt/tipoCambio.txt'
+    df = pd.read_csv(dwn_url_tipocambio, names=headers_filter['tipocambio'],sep='|')
+    list_t= df.values.tolist()
+    
+    var1 = list_t[0][1]
+    
     return amount * var1
     
 
 def load_master_order():
-    print(f" INICIO LOAD MASTER")
-
-    headers_filter = {
-    'tipocambio': ['fecha' ,'compra','venta','nan']
-    }
-    #Obtiene tipo de cambio
-    dwn_url_tipocambio= 'https://www.sunat.gob.pe/a/txt/tipoCambio.txt'
-    df = pd.read_csv(dwn_url_tipocambio, names=headers_filter['tipocambio'],sep='|')
-    list_t= df.values.tolist()
-    var1 = list_t[0][1]
-    
+    print(f" INICIO LOAD MASTER")    
     client = bigquery.Client(project='zeta-medley-405005')
     
     sql = """
