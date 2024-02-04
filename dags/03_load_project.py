@@ -20,6 +20,18 @@ default_args = {
     'retry_delay': timedelta(minutes=1),
 }
 
+headers_filter = {
+    'tipocambio': ['fecha' ,'compra','venta','nan']
+    }
+    
+dwn_url_tipocambio= 'https://www.sunat.gob.pe/a/txt/tipoCambio.txt'
+df = pd.read_csv(dwn_url_tipocambio, names=headers_filter['tipocambio'],sep='|')
+list_t= df.values.tolist()
+
+var1 = list_t[0][1]
+
+
+
 def get_connect_mongo():
 
     CONNECTION_STRING ="mongodb+srv://atlas:T6.HYX68T8Wr6nT@cluster0.enioytp.mongodb.net/?retryWrites=true&w=majority"
@@ -366,7 +378,11 @@ def get_group_status(text):
     return d
 
 
-def get_national_currency(amount):
+    
+
+def load_master_order():
+    
+    print(f" INICIO LOAD MASTER")    
     headers_filter = {
     'tipocambio': ['fecha' ,'compra','venta','nan']
     }
@@ -376,12 +392,8 @@ def get_national_currency(amount):
     list_t= df.values.tolist()
     
     var1 = list_t[0][1]
-    
-    return amount * var1
-    
 
-def load_master_order():
-    print(f" INICIO LOAD MASTER")    
+    
     client = bigquery.Client(project='zeta-medley-405005')
     
     sql = """
@@ -397,8 +409,12 @@ def load_master_order():
     """
     
     m_orders_df = client.query(sql_2).to_dataframe()
+
+    print(f" TERMINO LECTURA DE TABLAS ") 
     
     df_join = m_orders_df.merge(m_order_items_df, left_on='order_id', right_on='order_item_order_id', how='inner')
+
+    print(f" TERMINO JOIN") 
     
     df_master=df_join[[ 'order_id', 'order_date_x', 'order_customer_id',
        'order_status',  'order_item_id',
@@ -410,8 +426,13 @@ def load_master_order():
     df_master['order_status_group']  = df_master['order_status'].map(get_group_status)
     df_master['order_date'] = df_master['order_date'].astype(str)
     df_master['order_date'] = pd.to_datetime(df_master['order_date'], format='%Y-%m-%d').dt.date
+
+    print(f" TERMINO status_group")
+    
     df_master['order_item_subtotal_mn']  = df_master['order_item_subtotal'].map(get_national_currency)
 
+    print(f" TERMINO subtotal_mn") 
+    
     master_rows=len(df_master)
     print(f" Se obtuvo  {master_rows}  Filas")
 
@@ -528,7 +549,7 @@ def load_segmentToMongo():
     """
     
     segment_df = client.query(query_string).to_dataframe()
-    segment_dict = segment_df.to_dict(orients = 'records')
+    segment_dict = segment_df.to_dict(orient='records')
     
     dbconnect = get_connect_mongo()
     dbname=dbconnect["retail_db"]
