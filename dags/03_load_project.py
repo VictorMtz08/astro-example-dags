@@ -269,9 +269,9 @@ def load_categories():
     categories_rows=len(categories_df)
     
     if categories_rows>0 :
-        client = bigquery.Client()
-    
-        table_id =  "premium-guide-410714.dep_raw.categories"
+        client = bigquery.Client(project='zeta-medley-405005')
+        table_id =  "zeta-medley-405005.dep_raw.categories"
+        
         job_config = bigquery.LoadJobConfig(
             schema=[
                 bigquery.SchemaField("category_id", bigquery.enums.SqlTypeNames.INTEGER),
@@ -295,6 +295,52 @@ def load_categories():
         )
     else : 
         print('alerta no hay registros en la tabla categories')
+
+
+def load_departments():
+    print(f" INICIO LOAD CATEGORIES")
+    
+    dbconnect = get_connect_mongo()
+    dbname=dbconnect["retail_db"]
+    collection_name = dbname["departments"] 
+    departments = collection_name.find({})
+    departments_df = DataFrame(departments)
+    dbconnect.close()
+    
+    departments_df = departments_df.drop(columns=['_id'])
+    
+    departments_rows=len(departments_df)
+    print(f" Se obtuvo  {departments_rows}  Filas")
+
+    departments_rows=len(departments_df)
+    
+    if departments_rows>0 :
+        client = bigquery.Client(project='zeta-medley-405005')
+        table_id =  "zeta-medley-405005.dep_raw.departments"
+        
+        job_config = bigquery.LoadJobConfig(
+            schema=[
+                bigquery.SchemaField("department_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("department_name", bigquery.enums.SqlTypeNames.STRING)
+            ],
+            write_disposition="WRITE_TRUNCATE",
+        )
+    
+    
+        job = client.load_table_from_dataframe(
+            departments_df, table_id, job_config=job_config
+        )  
+        job.result()  # Wait for the job to complete.
+    
+        table = client.get_table(table_id)  # Make an API request.
+        print(
+            "Loaded {} rows and {} columns to {}".format(
+                table.num_rows, len(table.schema), table_id
+            )
+        )
+    else : 
+        print('alerta no hay registros en la tabla departments')
+
 
 
 
@@ -336,6 +382,11 @@ with DAG(
         python_callable=load_categories,
         dag=dag
     )
+    step_load_departments = PythonOperator(
+        task_id='load_departments_id',
+        python_callable=load_departments,
+        dag=dag
+    )
     step_end = PythonOperator(
         task_id='step_end_id',
         python_callable=end_process,
@@ -346,10 +397,12 @@ with DAG(
     step_start>>step_load_order_items
     step_start>>step_load_customers
     step_start>>step_load_categories
+    step_start>>step_load_departments
     step_load_products>>step_end
     step_load_orders>>step_end
     step_load_order_items>>step_end
     step_load_customers>>step_end
     step_load_categories>>step_end
+    step_load_departments>>step_end
 
 
