@@ -298,7 +298,7 @@ def load_categories():
 
 
 def load_departments():
-    print(f" INICIO LOAD CATEGORIES")
+    print(f" INICIO LOAD DEPARTMENTS")
     
     dbconnect = get_connect_mongo()
     dbname=dbconnect["retail_db"]
@@ -341,6 +341,16 @@ def load_departments():
     else : 
         print('alerta no hay registros en la tabla departments')
 
+
+def load_departments_delta():
+    print(f" DEPARTMENTS SOLO EJECUTA DIA LUNES")
+
+def run_departments():
+    today = date.today()
+    if today.weekday()==1 :
+        return "load_departments"
+    else :
+        return "load_departments_delta"
 
 
 
@@ -566,7 +576,8 @@ with DAG(
     )
     step_load_departments = PythonOperator(
         task_id='load_departments_id',
-        python_callable=load_departments,
+        #python_callable=load_departments,
+        python_callable=run_departments,
         dag=dag
     )
     step_load_master_order = PythonOperator(
