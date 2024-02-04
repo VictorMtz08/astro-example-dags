@@ -103,9 +103,9 @@ def load_orders():
     print(f" Se obtuvo  {orders_rows}  Filas")
     orders_rows=len(orders_df)
     if orders_rows>0 :
-        client = bigquery.Client()
-    
-        table_id =  "premium-guide-410714.dep_raw.orders"
+        client = bigquery.Client(project='zeta-medley-405005')
+        table_id =  "zeta-medley-405005.dep_raw.orders"
+        
         job_config = bigquery.LoadJobConfig(
             schema=[
                 bigquery.SchemaField("_id", bigquery.enums.SqlTypeNames.STRING),
